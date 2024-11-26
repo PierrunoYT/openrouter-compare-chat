@@ -37,6 +37,7 @@ class ChatUI {
     private modelParameters: ModelParameters;
     private maxRetries: number = 3;
     private retryDelay: number = 1000; // 1 second
+    private baseUrl: string = 'https://openrouter.ai/api/v1';
 
     constructor() {
         this.messageContainer = document.getElementById('messagesContainer') as HTMLElement;
@@ -97,9 +98,10 @@ class ChatUI {
     }
 
     private async fetchKeyInfo(): Promise<Key> {
-        const response = await fetch('https://openrouter.ai/api/v1/auth/key', {
+        const response = await fetch(`${this.baseUrl}/auth/key`, {
             headers: {
                 'Authorization': `Bearer ${this.apiKey}`,
+                'HTTP-Referer': window.location.href,
             }
         });
 
@@ -149,10 +151,11 @@ class ChatUI {
 
     private async fetchAvailableModels(): Promise<void> {
         try {
-            const response = await this.fetchWithRetry('https://openrouter.ai/api/v1/models', {
-                headers: this.apiKey ? {
-                    'Authorization': `Bearer ${this.apiKey}`,
-                } : {}
+            const response = await this.fetchWithRetry(`${this.baseUrl}/models`, {
+                headers: {
+                    'Authorization': this.apiKey ? `Bearer ${this.apiKey}` : '',
+                    'HTTP-Referer': window.location.href,
+                }
             });
 
             const data = await response.json();
@@ -183,7 +186,6 @@ class ChatUI {
         this.modelCheckboxes.querySelectorAll('.provider-header, .model-checkbox').forEach((element) => {
             if (element.classList.contains('provider-header')) {
                 if (currentProvider !== '') {
-                    // Hide previous provider header if it had no visible models
                     const prevHeader = this.modelCheckboxes.querySelector(`.provider-header[data-provider="${currentProvider}"]`);
                     if (prevHeader && !hasVisibleModelInProvider) {
                         prevHeader.classList.add('hidden');
@@ -207,7 +209,6 @@ class ChatUI {
             }
         });
 
-        // Check the last provider
         if (currentProvider !== '') {
             const lastHeader = this.modelCheckboxes.querySelector(`.provider-header[data-provider="${currentProvider}"]`);
             if (lastHeader && !hasVisibleModelInProvider) {
@@ -423,10 +424,9 @@ class ChatUI {
         this.currentStreamControllers.set(modelId, controller);
 
         try {
-            // Prepare messages with cache control for Anthropic models
             const preparedMessages = this.prepareMessagesWithCache(this.messages, modelId);
 
-            const response = await this.fetchWithRetry('https://openrouter.ai/api/v1/chat/completions', {
+            const response = await this.fetchWithRetry(`${this.baseUrl}/chat/completions`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.apiKey}`,
@@ -442,20 +442,27 @@ class ChatUI {
                 signal: controller.signal
             });
 
-            // Get generation stats to check cache usage
-            const statsResponse = await this.fetchWithRetry(
-                `https://openrouter.ai/api/v1/generation/${response.headers.get('x-request-id')}`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.apiKey}`,
-                    }
-                }
-            );
+            const requestId = response.headers.get('x-request-id');
+            if (requestId) {
+                try {
+                    const statsResponse = await this.fetchWithRetry(
+                        `${this.baseUrl}/generation/${requestId}`,
+                        {
+                            headers: {
+                                'Authorization': `Bearer ${this.apiKey}`,
+                                'HTTP-Referer': window.location.href,
+                            }
+                        }
+                    );
 
-            const stats: GenerationStats = await statsResponse.json();
-            if (stats.data.cache_discount !== null) {
-                console.log(`Cache discount for ${modelId}: ${stats.data.cache_discount}`);
-                this.addCacheInfo(modelId, stats.data.cache_discount, messageGroup);
+                    const stats: GenerationStats = await statsResponse.json();
+                    if (stats.data.cache_discount !== null) {
+                        console.log(`Cache discount for ${modelId}: ${stats.data.cache_discount}`);
+                        this.addCacheInfo(modelId, stats.data.cache_discount, messageGroup);
+                    }
+                } catch (error) {
+                    console.error('Error fetching generation stats:', error);
+                }
             }
 
             const reader = response.body?.getReader();
@@ -527,14 +534,12 @@ class ChatUI {
     }
 
     private prepareMessagesWithCache(messages: Message[], modelId: string): Message[] {
-        // Only add cache control for Anthropic models
         if (!modelId.startsWith('anthropic/')) {
             return messages;
         }
 
         return messages.map(msg => {
             if (typeof msg.content === 'string') {
-                // For text messages over 1024 tokens (approximate), add cache control
                 if (msg.content.length > 4096) {
                     return {
                         ...msg,
@@ -549,7 +554,6 @@ class ChatUI {
                 }
                 return msg;
             }
-            // For array content (like images), add cache control to large text content
             return {
                 ...msg,
                 content: msg.content.map(content => {
