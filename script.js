@@ -9,6 +9,7 @@ class ChatUI {
         this.messages = [];
         this.apiKey = localStorage.getItem('openRouterApiKey');
         this.availableModels = [];
+        this.currentStreamControllers = new Map(); // Store AbortControllers for streams
 
         this.initialize();
     }
@@ -125,16 +126,66 @@ class ChatUI {
                 }
             }
         });
+
+        // Handle file drops for images
+        this.userInput.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.userInput.classList.add('dragover');
+        });
+
+        this.userInput.addEventListener('dragleave', () => {
+            this.userInput.classList.remove('dragover');
+        });
+
+        this.userInput.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.userInput.classList.remove('dragover');
+
+            const files = Array.from(e.dataTransfer.files);
+            const imageFiles = files.filter(file => file.type.startsWith('image/'));
+            
+            if (imageFiles.length > 0) {
+                await this.handleImageUpload(imageFiles[0]);
+            }
+        });
     }
 
-    checkApiKey() {
-        if (!this.apiKey) {
-            const key = prompt('Please enter your OpenRouter API key:');
-            if (key) {
-                this.apiKey = key;
-                localStorage.setItem('openRouterApiKey', key);
-            }
+    async handleImageUpload(file) {
+        try {
+            const base64Image = await this.fileToBase64(file);
+            const imageMessage = {
+                role: 'user',
+                content: [
+                    {
+                        type: 'text',
+                        text: this.userInput.value || "What's in this image?"
+                    },
+                    {
+                        type: 'image_url',
+                        image_url: {
+                            url: base64Image
+                        }
+                    }
+                ]
+            };
+            
+            await this.sendMessageToModels(imageMessage);
+            this.userInput.value = '';
+        } catch (error) {
+            console.error('Error handling image:', error);
+            this.addError('Failed to process image. Please try again.');
         }
+    }
+
+    async fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
     }
 
     async handleSend() {
@@ -145,20 +196,31 @@ class ChatUI {
             return;
         }
 
-        // Disable input while processing
-        this.setLoading(true);
+        const message = {
+            role: 'user',
+            content: userMessage
+        };
 
-        // Add user message to UI
-        this.addMessage('user', userMessage);
+        await this.sendMessageToModels(message);
         this.userInput.value = '';
+    }
+
+    async sendMessageToModels(message) {
+        // Add user message to messages array and UI
+        this.messages.push(message);
+        this.addMessage('user', typeof message.content === 'string' ? message.content : 'Sent image with message: ' + message.content[0].text);
 
         // Create message group for responses
         const messageGroup = document.createElement('div');
         messageGroup.className = 'message-group';
+        this.messageContainer.appendChild(messageGroup);
+
+        // Cancel any existing streams
+        this.cancelAllStreams();
 
         // Send message to each selected model
         const promises = Array.from(this.selectedModels).map(modelId => 
-            this.sendMessage(userMessage, modelId, messageGroup)
+            this.streamResponse(message, modelId, messageGroup)
         );
 
         try {
@@ -167,11 +229,12 @@ class ChatUI {
             console.error('Error sending messages:', error);
             this.addError('Failed to send messages to some models');
         }
-
-        this.setLoading(false);
     }
 
-    async sendMessage(message, modelId, messageGroup) {
+    async streamResponse(message, modelId, messageGroup) {
+        const controller = new AbortController();
+        this.currentStreamControllers.set(modelId, controller);
+
         try {
             const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
@@ -182,23 +245,87 @@ class ChatUI {
                 },
                 body: JSON.stringify({
                     model: modelId,
-                    messages: [{ role: 'user', content: message }]
-                })
+                    messages: this.messages,
+                    stream: true,
+                    temperature: 0.7
+                }),
+                signal: controller.signal
             });
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const data = await response.json();
-            const assistantMessage = data.choices[0].message.content;
-            
-            // Add assistant message to UI
-            this.addModelResponse(modelId, assistantMessage, messageGroup);
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let responseDiv = this.createResponseDiv(modelId, messageGroup);
+            let accumulatedResponse = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            const content = data.choices[0]?.delta?.content || '';
+                            accumulatedResponse += content;
+                            responseDiv.lastChild.textContent = accumulatedResponse;
+                        } catch (e) {
+                            console.error('Error parsing stream:', e);
+                        }
+                    }
+                }
+            }
+
+            // Add the complete message to our messages array
+            this.messages.push({
+                role: 'assistant',
+                content: accumulatedResponse
+            });
+
         } catch (error) {
-            console.error(`Error with model ${modelId}:`, error);
-            this.addModelResponse(modelId, 'Error: Failed to get response', messageGroup, true);
+            if (error.name === 'AbortError') {
+                console.log('Stream cancelled for model:', modelId);
+            } else {
+                console.error(`Error with model ${modelId}:`, error);
+                this.addModelResponse(modelId, 'Error: Failed to get response', messageGroup, true);
+            }
+        } finally {
+            this.currentStreamControllers.delete(modelId);
         }
+    }
+
+    cancelAllStreams() {
+        for (const controller of this.currentStreamControllers.values()) {
+            controller.abort();
+        }
+        this.currentStreamControllers.clear();
+    }
+
+    createResponseDiv(modelId, messageGroup) {
+        const modelName = this.availableModels.find(m => m.id === modelId)?.name || modelId;
+        
+        const responseDiv = document.createElement('div');
+        responseDiv.className = 'message assistant-message';
+
+        const modelNameDiv = document.createElement('div');
+        modelNameDiv.className = 'model-name';
+        modelNameDiv.textContent = modelName;
+
+        const contentDiv = document.createElement('div');
+        contentDiv.textContent = '';
+
+        responseDiv.appendChild(modelNameDiv);
+        responseDiv.appendChild(contentDiv);
+        messageGroup.appendChild(responseDiv);
+        
+        this.scrollToBottom();
+        return responseDiv;
     }
 
     addMessage(role, content) {
@@ -250,6 +377,16 @@ class ChatUI {
 
     scrollToBottom() {
         this.messageContainer.scrollTop = this.messageContainer.scrollHeight;
+    }
+
+    checkApiKey() {
+        if (!this.apiKey) {
+            const key = prompt('Please enter your OpenRouter API key:');
+            if (key) {
+                this.apiKey = key;
+                localStorage.setItem('openRouterApiKey', key);
+            }
+        }
     }
 }
 

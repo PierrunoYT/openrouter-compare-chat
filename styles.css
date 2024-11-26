@@ -176,3 +176,36 @@ button:disabled {
     margin-top: 5px;
     font-size: 0.9rem;
 }
+
+.userInput.dragover {
+    border-color: #2196f3;
+    background-color: #e3f2fd;
+}
+
+.message img {
+    max-width: 100%;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.assistant-message.streaming {
+    position: relative;
+}
+
+.assistant-message.streaming::after {
+    content: '';
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    width: 8px;
+    height: 8px;
+    background-color: #2196f3;
+    border-radius: 50%;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.95); opacity: 0.5; }
+    50% { transform: scale(1.05); opacity: 0.8; }
+    100% { transform: scale(0.95); opacity: 0.5; }
+}
