@@ -38,6 +38,29 @@ header h1 {
     overflow-y: auto;
 }
 
+.model-search {
+    margin-bottom: 15px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #e3f2fd;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #2196f3;
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+}
+
+.search-input::placeholder {
+    color: #9e9e9e;
+}
+
 .model-checkboxes {
     display: flex;
     flex-direction: column;
@@ -78,6 +101,54 @@ header h1 {
 .model-context {
     color: #757575;
     font-size: 0.85rem;
+}
+
+/* Parameters Section Styles */
+.parameters-section {
+    background-color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.parameters-section h3 {
+    color: #2196f3;
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    padding-bottom: 5px;
+    border-bottom: 2px solid #e3f2fd;
+}
+
+.parameter-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+}
+
+.parameter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.parameter-group label {
+    font-size: 0.9rem;
+    color: #424242;
+}
+
+.parameter-group input[type="number"] {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    width: 100%;
+}
+
+.parameter-group input[type="number"]:focus {
+    outline: none;
+    border-color: #2196f3;
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
 }
 
 .chat-container {
@@ -121,6 +192,25 @@ header h1 {
     font-weight: bold;
     color: #2196f3;
     margin-bottom: 5px;
+}
+
+.cache-info {
+    font-size: 0.85rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+    margin-top: 8px;
+    display: inline-block;
+}
+
+.cache-info.positive {
+    color: #4CAF50;
+    background-color: #E8F5E9;
+}
+
+.cache-info.negative {
+    color: #FF9800;
+    background-color: #FFF3E0;
 }
 
 .input-container {
@@ -208,4 +298,12 @@ button:disabled {
     0% { transform: scale(0.95); opacity: 0.5; }
     50% { transform: scale(1.05); opacity: 0.8; }
     100% { transform: scale(0.95); opacity: 0.5; }
+}
+
+.model-checkbox.hidden {
+    display: none;
+}
+
+.provider-header.hidden {
+    display: none;
 }
