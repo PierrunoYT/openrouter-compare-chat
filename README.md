@@ -1,6 +1,8 @@
-# OpenRouter Chat
+# OpenRouter Compare Chat
 
 A web-based chat interface that allows you to interact with multiple AI models from OpenRouter simultaneously and compare their responses side by side.
+
+Repository: [https://github.com/PierrunoYT/openrouter-compare-chat](https://github.com/PierrunoYT/openrouter-compare-chat)
 
 ## Features
 
@@ -16,8 +18,8 @@ A web-based chat interface that allows you to interact with multiple AI models f
 
 1. Clone the repository:
 ```bash
-git clone [your-repository-url]
-cd openrouter-chat
+git clone https://github.com/PierrunoYT/openrouter-compare-chat.git
+cd openrouter-compare-chat
 ```
 
 2. Install dependencies and build the project:
@@ -50,4 +52,4 @@ Feel free to open issues or submit pull requests if you have suggestions for imp
 
 ## License
 
-MIT License - feel free to use this code for any purpose.
+[MIT License](LICENSE) - feel free to use this code for any purpose.
