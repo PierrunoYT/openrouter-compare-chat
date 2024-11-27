@@ -29,6 +29,7 @@ class ChatUI {
     private sendButton: HTMLButtonElement;
     private modelCheckboxes: HTMLElement;
     private modelSearch: HTMLInputElement;
+    private darkModeToggle: HTMLButtonElement;
     private selectedModels: Set<string>;
     private messages: Message[];
     private apiKey: string | null;
@@ -45,6 +46,7 @@ class ChatUI {
         this.sendButton = document.getElementById('sendButton') as HTMLButtonElement;
         this.modelCheckboxes = document.getElementById('modelCheckboxes') as HTMLElement;
         this.modelSearch = document.getElementById('modelSearch') as HTMLInputElement;
+        this.darkModeToggle = document.getElementById('darkModeToggle') as HTMLButtonElement;
         this.selectedModels = new Set();
         this.messages = [];
         this.apiKey = localStorage.getItem('openRouterApiKey');
@@ -69,6 +71,22 @@ class ChatUI {
         this.createModelCheckboxes();
         this.setupEventListeners();
         await this.checkApiKeyAndCredits();
+        this.initializeTheme();
+    }
+
+    private initializeTheme(): void {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        this.darkModeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+    }
+
+    private toggleTheme(): void {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        this.darkModeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
     }
 
     private async checkApiKeyAndCredits(): Promise<void> {
@@ -274,6 +292,7 @@ class ChatUI {
     }
 
     private setupEventListeners(): void {
+        this.darkModeToggle.addEventListener('click', () => this.toggleTheme());
         this.sendButton.addEventListener('click', () => this.handleSend());
         this.userInput.addEventListener('keypress', (e: KeyboardEvent) => {
             if (e.key === 'Enter' && !e.shiftKey) {
