@@ -20,9 +20,18 @@ git clone [your-repository-url]
 cd openrouter-chat
 ```
 
-2. Open `index.html` in your web browser.
+2. Install dependencies and build the project:
+```bash
+npm install
+npm run build   # This creates the dist folder with compiled JavaScript
+```
 
-3. When prompted, enter your OpenRouter API key. You can get one from [OpenRouter's website](https://openrouter.ai/).
+3. Start the development server:
+```bash
+npm start
+```
+
+4. When prompted, enter your OpenRouter API key. You can get one from [OpenRouter's website](https://openrouter.ai/).
 
 ## Usage
 
